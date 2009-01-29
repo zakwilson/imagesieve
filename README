@@ -1,0 +1,30 @@
+It makes a new folder called "foldername-grey" if one doesn't already
+exist.
+
+It doesn't go in to subfolders.
+
+It ignores files it can't process.
+
+The counter isn't accurate.
+
+It will use all the cores on your computer.
+
+It might be slow on a Mac. I'm not sure about this part.
+
+It should run on just about anything - you can give it to your
+Windows-using friends.
+
+It will use the original filename unless a file with that name is
+already in foldername-grey, in which case it will append a number. It
+will never overwrite an existing file.
+
+It's really simple - just click the button and select a folder.
+
+It doesn't support RAW images (but it does support jpeg, gif, png, bmp
+and more).
+
+It doesn't keep metadata like jpeg's EXIF in the converted images. The
+biggest problem with this is that pictures that are taken sideways and
+automagically flipped upright by some programs won't be in the converted
+images.
+
