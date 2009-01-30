@@ -37,27 +37,39 @@
              (.setDefaultCloseOperation (WindowConstants/EXIT_ON_CLOSE))
              (.pack)))
 
+(def chooser (doto (JFileChooser.)
+               (.setFileSelectionMode (JFileChooser/DIRECTORIES_ONLY))))
+
 (defn process-and-update [img]
   (make-grey! img)
   (update-counter)
   img)
 
-(defn choose-and-go [] 
-  (let [fc (doto (JFileChooser.)
-             (.setFileSelectionMode (JFileChooser/DIRECTORIES_ONLY)))
-        status (.showOpenDialog fc frame)]
-    (when (= (JFileChooser/APPROVE_OPTION) status)
-      (let [path (.getAbsolutePath (.getSelectedFile fc))
-            dir (File. path)]
-        (if (and (.exists dir) (.isDirectory dir))
-          (do (send-off *max* identity* (count (.list dir)))
-              (send-off *count* identity* -1)
-              (update-counter)
-              (doall (process-dir process-and-update ;shouldn't be lazy, but doesn't always complete
-                                  path
-                                  (str path "-grey/"))))
-          (JOptionPane/showMessageDialog nil
-                                         "Alert"
-                                         "Sorry, I couldn't find the directory you asked for" (JOptionPane/ERROR_MESSAGE)))))))
+(defn error->str [e]
+  (str (.getMessage e) ", "))
 
-(defn -main [] (. frame show))
+(defn choose-and-go [] 
+  (let [status (.showOpenDialog chooser frame)]
+    (when (= (JFileChooser/APPROVE_OPTION) status)
+      (try
+       (let [path (.getAbsolutePath (.getSelectedFile chooser))
+             dir (File. path)]
+         (if (and (.exists dir) (.isDirectory dir))
+           (do (send-off *max* identity* (count (.list dir)))
+               (send-off *count* identity* -1)
+               (update-counter)
+               (doall (process-dir process-and-update ;shouldn't be lazy, but doesn't always complete
+                                   path
+                                   (str path "-grey/"))))
+          (JOptionPane/showMessageDialog nil
+                                         "Sorry, I couldn't find the directory you asked for"
+                                         "Alert"
+                                         (JOptionPane/ERROR_MESSAGE))))
+       (catch Exception e (JOptionPane/showMessageDialog nil
+                                                         (.getMessage e)
+                                                         "Error"
+                                                         (JOptionPane/ERROR_MESSAGE)))))))
+
+(defn -main [] 
+  (. frame show))
+;  (require 'zutil.repl))
