@@ -5,8 +5,6 @@ It doesn't go in to subfolders.
 
 It ignores files it can't process.
 
-The counter isn't accurate.
-
 It will use all the cores on your computer.
 
 It might be slow on a Mac. I'm not sure about this part.
