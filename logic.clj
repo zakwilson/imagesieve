@@ -11,11 +11,16 @@
   (:import (java.io File)
            (javax.imageio ImageIO)))
 
+(in-ns 'imagesieve.logic)
+
+; We were running out of memory on single-core machines without much RAM
+; and using map instead of pmap requires less memory.
+
+; TODO - actually check available memory, maybe recover from outofmemory.
+
 (if (> 2 (.availableProcessors (Runtime/getRuntime)))
   (def mapfn map)
   (def mapfn pmap))
-
-(in-ns 'imagesieve.logic)
 
 (defn image-format [filename]
   (some #(re-find (re-pattern %) filename)
@@ -27,18 +32,16 @@
      (when-not (nil? img)
        (op img)
        (write-image img (image-format infile) (unique-filename outfile))))
-   (catch Exception e nil)
+   (catch Exception e nil) 
    (catch java.lang.OutOfMemoryError e
      (throw (Exception. "Sorry, we seem to have used up all your memory. Close some programs and try again.")))))
 
 (defn process-dir [op indir outdir]
-  (let [id (File. indir)
-        od (File. outdir)
-        ls (.list id)
-        inpath (.getAbsolutePath id)
-        outpath (.getAbsolutePath od)]
+  (let [od (File. outdir)
+        id (File. indir)]
     (when-not (.exists od)
       (.mkdir od))
     (mapfn #(process-file op
-                         (str inpath (File/separator) %)
-                         (str outpath (File/separator) %)) ls)))
+                         (str (.getAbsolutePath id) (File/separator) %)
+                         (str (.getAbsolutePath od) (File/separator) %))
+           (.list id))))

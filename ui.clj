@@ -14,7 +14,10 @@
   (:gen-class))
  
 (in-ns 'imagesieve.ui)
- 
+
+; I hate the old GTK file chooser.
+; TODO - use native look and feel except with file chooser.
+
 (when-not (= "com.sun.java.swing.plaf.gtk.GTKLookAndFeel"
              (UIManager/getSystemLookAndFeelClassName))
   (UIManager/setLookAndFeel (UIManager/getSystemLookAndFeelClassName)))
@@ -29,7 +32,7 @@
  
 (def *max* (atom 0))
  
-(def *status* (JLabel. "0/0 completed"))
+(def *status* (JLabel. "0/0 completed    "))
  
 (defn update-counter [& args]
   (dosync (alter *count* inc)
@@ -37,25 +40,27 @@
                     (str @*count* "/" @*max* " completed"))))
 
  
-(defn choose-and-go []) ;placeholder
+(defn choose-and-go []) ; Placeholder for frame.
  
-(def frame (doto (JFrame. "Greyscale Converter")
-             (.add (doto (JPanel.)
-                     (.add (doto (JButton. "Convert a folder to greyscale")
-                             (.addActionListener
-                              (proxy [ActionListener] []
-                                (actionPerformed [e] (choose-and-go))))))
-                     (.add *status*)))
-             (.setDefaultCloseOperation (WindowConstants/EXIT_ON_CLOSE))
-             (.pack)))
+(def frame ; The main UI window - defined at the toplevel so the JFileChooser can refer to it.
+     (doto (JFrame. "Greyscale Converter")
+       (.add (doto (JPanel.)
+               (.add (doto (JButton. "Convert a folder to greyscale")
+                       (.addActionListener
+                        (proxy [ActionListener] []
+                          (actionPerformed [e] (choose-and-go))))))
+               (.add *status*)))
+       (.setDefaultCloseOperation (WindowConstants/EXIT_ON_CLOSE))
+       (.pack)))
  
+; Persistant file chooser so it remembers the last dir.
+
 (def chooser (doto (JFileChooser.)
                (.setFileSelectionMode (JFileChooser/DIRECTORIES_ONLY))))
  
 (defn process-and-update [img]
   (make-grey! img)
-  (update-counter)
-  img)
+  (update-counter))
 
 (defn do-processing [state path]
  (try (doall (process-dir process-and-update
@@ -64,7 +69,21 @@
       (catch Exception e (error-message e)))
  nil)
 
-(def *processor* (agent nil))
+(def #^{:doc "This agent exists to run the processing from a separate thread.
+      Doing so instead of having a direct callback from the JFileChooser
+      makes the counter in the UI update in real-time."}
+     *processor*
+     (agent nil))
+
+(defn handle-dir [path]
+  (swap! *max* identity*
+         (count (filter image-format
+                        (.list (File. path)))))
+  (dosync (ref-set *count* -1))
+  (update-counter)
+  (send-off *processor* do-processing path)
+  (when (agent-errors *processor*)
+    (error-message (first (agent-errors *processor*)))))
 
 (defn choose-and-go []
   (let [status (.showOpenDialog chooser frame)]
@@ -73,16 +92,11 @@
        (let [path (.getAbsolutePath (.getSelectedFile chooser))
              dir (File. path)]
          (if (and (.exists dir) (.isDirectory dir))
-           (do (swap! *max* identity* (count (.list dir)))
-               (dosync (ref-set  *count* -1))
-               (update-counter)
-               (send-off *processor* do-processing path)
-               (when (agent-errors *processor*)
-                 (error-message (first (agent-errors *processor*)))))
-          (JOptionPane/showMessageDialog nil
-                                         "Sorry, I couldn't find the directory you asked for"
-                                         "Alert"
-                                         (JOptionPane/ERROR_MESSAGE))))
+           (handle-dir path)
+           (JOptionPane/showMessageDialog nil
+                                          "Sorry, I couldn't find the directory you asked for"
+                                          "Alert"
+                                          (JOptionPane/ERROR_MESSAGE))))
        (catch Exception e (error-message e))))))
  
 (defn -main []
